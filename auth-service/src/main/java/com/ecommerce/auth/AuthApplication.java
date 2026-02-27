@@ -12,7 +12,7 @@ public class AuthApplication {
 
     public static void main(String[] args) throws Exception {
         String password = "admin123";
-        MessageDigest md = MessageDigest.getInstance("MD5"); // Weak hashing
+        MessageDigest md = MessageDigest.getInstance("SHA-256"); // Use stronger hashing algorithm
         md.digest(password.getBytes());
 
         SpringApplication.run(AuthApplication.class, args);
