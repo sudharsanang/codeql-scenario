@@ -1,0 +1,63 @@
+name: Security Alerts to Issues
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: read
+  issues: write
+
+jobs:
+  sync-security-issues:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Fetch CodeQL Alerts
+        run: |
+          curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/code-scanning/alerts \
+            > codeql_alerts.json
+
+      - name: Fetch Existing Security Issues
+        run: |
+          curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/issues?labels=security \
+            > existing_issues.json
+
+      - name: Create Issues for High/Critical Alerts
+        run: |
+          cat codeql_alerts.json | jq -c '.[] |
+          select(.rule.security_severity_level == "high" or
+                 .rule.security_severity_level == "critical")' |
+          while read alert; do
+
+            ALERT_URL=$(echo $alert | jq -r '.html_url')
+            TITLE=$(echo $alert | jq -r '.rule.description')
+            RULE_ID=$(echo $alert | jq -r '.rule.id')
+
+            EXISTS=$(cat existing_issues.json | jq \
+              --arg url "$ALERT_URL" \
+              '.[] | select(.body | contains($url))')
+
+            if [ -z "$EXISTS" ]; then
+              curl -X POST \
+                -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github+json" \
+                https://api.github.com/repos/${{ github.repository }}/issues \
+                -d "{
+                      \"title\": \"[SECURITY] $TITLE\",
+                      \"body\": \"Security alert detected.\n\nRule: $RULE_ID\n\nAlert: $ALERT_URL\",
+                      \"labels\": [\"security\"],
+                      \"assignees\": [\"YOUR_GITHUB_USERNAME\"]
+                    }"
+            fi
+          done
