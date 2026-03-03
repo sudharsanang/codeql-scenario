@@ -1,19 +1,18 @@
-package com.ecommerce.auth;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-import java.security.MessageDigest;
-
-@SpringBootApplication
 public class AuthApplication {
 
-    private static final String JWT_SECRET = "HardcodedJWTSecret123"; // Vulnerable
+    private static final String JWT_SECRET = "HardcodedJWTSecret123";
 
     public static void main(String[] args) throws Exception {
-        String password = "admin123";
-        MessageDigest md = MessageDigest.getInstance("MD5"); // Use stronger hashing algorithm
-        md.digest(password.getBytes());
+
+        String token = Jwts.builder()
+                .setSubject("admin")
+                .signWith(SignatureAlgorithm.HS256, JWT_SECRET)
+                .compact();
+
+        System.out.println(token);
 
         SpringApplication.run(AuthApplication.class, args);
     }
